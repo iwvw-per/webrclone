@@ -15,21 +15,24 @@ import (
 )
 
 type Task struct {
-	ID          string    `json:"id"`
-	Command     string    `json:"command"`
-	Source      string    `json:"source"`
-	Destination string    `json:"destination"`
-	Flags       []string  `json:"flags"`
-	Status      string    `json:"status"` // running, success, failed, stopped
-	Progress    float64   `json:"progress"`
-	Speed       string    `json:"speed"`
-	ETA         string    `json:"eta"`
-	Transferred string    `json:"transferred"`
-	ActiveFiles []string  `json:"activeFiles"`
-	Logs        string    `json:"logs"`
-	StartTime   string    `json:"startTime"`
-	EndTime     string    `json:"endTime"`
-	cmd         *exec.Cmd `json:"-"`
+	ID               string    `json:"id"`
+	Command          string    `json:"command"`
+	Source           string    `json:"source"`
+	Destination      string    `json:"destination"`
+	Flags            []string  `json:"flags"`
+	Status           string    `json:"status"` // running, success, failed, stopped
+	Progress         float64   `json:"progress"`
+	Speed            string    `json:"speed"`
+	ETA              string    `json:"eta"`
+	Transferred      string    `json:"transferred"`
+	BytesTransferred string    `json:"bytesTransferred"`
+	FilesTransferred string    `json:"filesTransferred"`
+	ActiveThreads    int       `json:"activeThreads"`
+	ActiveFiles      []string  `json:"activeFiles"`
+	Logs             string    `json:"logs"`
+	StartTime        string    `json:"startTime"`
+	EndTime          string    `json:"endTime"`
+	cmd              *exec.Cmd `json:"-"`
 }
 
 var (
@@ -145,38 +148,7 @@ func splitLinesAndCarriageReturns(data []byte, atEOF bool) (advance int, token [
 }
 
 func StartTask(command, source, destination string, flags []string) (string, error) {
-	rclonePath, err := GetRclonePath()
-	if err != nil {
-		return "", err
-	}
-
-	if _, err := os.Stat(rclonePath); os.IsNotExist(err) {
-		return "", fmt.Errorf("rclone is not installed; download it first")
-	}
-
 	id := strconv.FormatInt(time.Now().UnixNano(), 10)
-
-	// Build the rclone arguments
-	// Always append -P to get progress output
-	args := []string{command, source, destination, "-P"}
-	args = append(args, flags...)
-
-	// Filter out empty flags
-	var cleanArgs []string
-	for _, arg := range args {
-		if strings.TrimSpace(arg) != "" {
-			cleanArgs = append(cleanArgs, arg)
-		}
-	}
-
-	// Add config flag if config file exists
-	cPath := GetConfigPath()
-	if _, err := os.Stat(cPath); err == nil {
-		cleanArgs = append(cleanArgs, "--config", cPath)
-	}
-
-	cmd := exec.Command(rclonePath, cleanArgs...)
-
 	task := &Task{
 		ID:          id,
 		Command:     command,
@@ -185,7 +157,6 @@ func StartTask(command, source, destination string, flags []string) (string, err
 		Flags:       flags,
 		Status:      "running",
 		StartTime:   time.Now().Format(time.RFC3339),
-		cmd:         cmd,
 	}
 
 	tasksLock.Lock()
@@ -193,21 +164,89 @@ func StartTask(command, source, destination string, flags []string) (string, err
 	saveTasks()
 	tasksLock.Unlock()
 
-	// Get stderr and stdout pipes
-	stdout, err := cmd.StdoutPipe()
+	err := runTaskProcess(task)
 	if err != nil {
 		return "", err
 	}
-	cmd.Stderr = cmd.Stdout // Redirect stderr to stdout to parse progress from both
+
+	return id, nil
+}
+
+func RestartTask(id string) error {
+	tasksLock.Lock()
+	task, ok := tasks[id]
+	tasksLock.Unlock()
+
+	if !ok {
+		return fmt.Errorf("task not found")
+	}
+
+	if task.Status == "running" {
+		return fmt.Errorf("task is already running")
+	}
+
+	tasksLock.Lock()
+	task.Status = "running"
+	task.Progress = 0
+	task.Speed = ""
+	task.ETA = ""
+	task.Transferred = ""
+	task.BytesTransferred = ""
+	task.FilesTransferred = ""
+	task.ActiveFiles = nil
+	task.ActiveThreads = 0
+	task.StartTime = time.Now().Format(time.RFC3339)
+	task.EndTime = ""
+	task.Logs = "[System] Task restarted by user.\n"
+	saveTasks()
+	tasksLock.Unlock()
+
+	return runTaskProcess(task)
+}
+
+func runTaskProcess(task *Task) error {
+	rclonePath, err := GetRclonePath()
+	if err != nil {
+		return err
+	}
+
+	if _, err := os.Stat(rclonePath); os.IsNotExist(err) {
+		return fmt.Errorf("rclone is not installed; download it first")
+	}
+
+	// Build arguments
+	args := []string{task.Command, task.Source, task.Destination, "-P"}
+	args = append(args, task.Flags...)
+
+	var cleanArgs []string
+	for _, arg := range args {
+		if strings.TrimSpace(arg) != "" {
+			cleanArgs = append(cleanArgs, arg)
+		}
+	}
+
+	cPath := GetConfigPath()
+	if _, err := os.Stat(cPath); err == nil {
+		cleanArgs = append(cleanArgs, "--config", cPath)
+	}
+
+	cmd := exec.Command(rclonePath, cleanArgs...)
+	task.cmd = cmd
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	cmd.Stderr = cmd.Stdout
 
 	if err := cmd.Start(); err != nil {
+		tasksLock.Lock()
 		task.Status = "failed"
 		task.EndTime = time.Now().Format(time.RFC3339)
 		task.Logs = fmt.Sprintf("Failed to start process: %v", err)
-		tasksLock.Lock()
 		saveTasks()
 		tasksLock.Unlock()
-		return "", err
+		return err
 	}
 
 	// Regular expressions for progress parsing
@@ -222,6 +261,9 @@ func StartTask(command, source, destination string, flags []string) (string, err
 		scanner.Split(splitLinesAndCarriageReturns)
 
 		var logLines []string
+		if task.Logs != "" {
+			logLines = strings.Split(task.Logs, "\n")
+		}
 		var activeFiles []string
 
 		for scanner.Scan() {
@@ -231,7 +273,6 @@ func StartTask(command, source, destination string, flags []string) (string, err
 				continue
 			}
 
-			// Save to log list (keep last 2000 lines to avoid high memory usage)
 			logLines = append(logLines, cleanText)
 			if len(logLines) > 2000 {
 				logLines = logLines[1:]
@@ -268,16 +309,19 @@ func StartTask(command, source, destination string, flags []string) (string, err
 				// Parse files/bytes transferred
 				transMatch := transReg.FindStringSubmatch(cleanText)
 				if len(transMatch) > 1 {
+					val := strings.TrimSpace(transMatch[1])
 					tasksLock.Lock()
-					task.Transferred = transMatch[1]
+					task.Transferred = val
+					if strings.Contains(val, "B") || strings.Contains(val, "b") || strings.Contains(val, "bytes") {
+						task.BytesTransferred = val
+					} else {
+						task.FilesTransferred = val
+					}
 					tasksLock.Unlock()
 				}
 
-				// If we hit "Transferred:" it means a progress block started
-				// Reset active files list for the next block
 				activeFiles = nil
 			} else if strings.HasPrefix(cleanText, "* ") {
-				// Parse active files: e.g. "* some_file.txt:  0% /1.234 MiB"
 				fileLine := strings.TrimPrefix(cleanText, "* ")
 				parts := strings.SplitN(fileLine, ":", 2)
 				if len(parts) > 0 {
@@ -288,14 +332,13 @@ func StartTask(command, source, destination string, flags []string) (string, err
 				}
 			}
 
-			// Update task in memory periodically
 			tasksLock.Lock()
 			task.Logs = strings.Join(logLines, "\n")
 			task.ActiveFiles = activeFiles
+			task.ActiveThreads = len(activeFiles)
 			tasksLock.Unlock()
 		}
 
-		// Wait for command execution to finish
 		err := cmd.Wait()
 		tasksLock.Lock()
 		task.EndTime = time.Now().Format(time.RFC3339)
@@ -313,5 +356,5 @@ func StartTask(command, source, destination string, flags []string) (string, err
 		tasksLock.Unlock()
 	}()
 
-	return id, nil
+	return nil
 }

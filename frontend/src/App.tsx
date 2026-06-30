@@ -14,7 +14,6 @@ import {
   Select,
   Table,
   Text,
-  Code,
   SensitiveInput
 } from "@cloudflare/kumo";
 import {
@@ -46,6 +45,9 @@ interface Task {
   speed: string;
   eta: string;
   transferred: string;
+  bytesTransferred?: string;
+  filesTransferred?: string;
+  activeThreads?: number;
   activeFiles: string[];
   logs: string;
   startTime: string;
@@ -112,6 +114,7 @@ export default function App() {
   const [taskSource, setTaskSource] = useState<string>("");
   const [taskDest, setTaskDest] = useState<string>("");
   const [taskFlags, setTaskFlags] = useState<string>("");
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
   // Selected Log Task State
   const [isLogsModalOpen, setIsLogsModalOpen] = useState<boolean>(false);
@@ -496,27 +499,64 @@ export default function App() {
 
     const flagsArr = taskFlags.trim() ? taskFlags.trim().split(/\s+/) : [];
 
-    apiFetch("/api/tasks/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        command: taskCommand,
-        source: taskSource.trim(),
-        destination: taskDest.trim(),
-        flags: flagsArr,
-      }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && data.id) {
-          showNotification("success", "任务启动成功！");
-          setIsTaskModalOpen(false);
-          setTaskSource("");
-          setTaskDest("");
-          setTaskFlags("");
+    if (editingTaskId) {
+      apiFetch("/api/tasks/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingTaskId,
+          command: taskCommand,
+          source: taskSource.trim(),
+          destination: taskDest.trim(),
+          flags: flagsArr,
+        }),
+      })
+        .then((res) => {
+          if (res.ok) {
+            restartTask(editingTaskId);
+            setIsTaskModalOpen(false);
+            setEditingTaskId(null);
+          } else {
+            showNotification("error", "更新任务配置失败！");
+          }
+        })
+        .catch(() => {});
+    } else {
+      apiFetch("/api/tasks/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          command: taskCommand,
+          source: taskSource.trim(),
+          destination: taskDest.trim(),
+          flags: flagsArr,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.id) {
+            showNotification("success", "任务启动成功！");
+            setIsTaskModalOpen(false);
+            setTaskSource("");
+            setTaskDest("");
+            setTaskFlags("");
+            fetchTasks();
+          } else {
+            showNotification("error", "启动传输任务失败！");
+          }
+        })
+        .catch(() => {});
+    }
+  };
+
+  const restartTask = (id: string) => {
+    apiFetch(`/api/tasks/restart?id=${id}`, { method: "POST" })
+      .then((res) => {
+        if (res.ok) {
+          showNotification("success", "任务已重新启动！");
           fetchTasks();
         } else {
-          showNotification("error", "启动传输任务失败！");
+          showNotification("error", "重新启动任务失败！");
         }
       })
       .catch(() => {});
@@ -533,6 +573,24 @@ export default function App() {
         }
       })
       .catch(() => {});
+  };
+
+  const openEditTaskModal = (task: Task) => {
+    setEditingTaskId(task.id);
+    setTaskCommand(task.command);
+    setTaskSource(task.source);
+    setTaskDest(task.destination);
+    setTaskFlags(task.flags ? task.flags.join(" ") : "");
+    setIsTaskModalOpen(true);
+  };
+
+  const openNewTaskModal = () => {
+    setEditingTaskId(null);
+    setTaskCommand("copy");
+    setTaskSource("");
+    setTaskDest("");
+    setTaskFlags("");
+    setIsTaskModalOpen(true);
   };
 
   const viewTaskLogs = (task: Task) => {
@@ -1028,7 +1086,7 @@ export default function App() {
                   <ArrowClockwise size={16} />
                   刷新
                 </Button>
-                <Button variant="primary" onClick={() => setIsTaskModalOpen(true)}>
+                <Button variant="primary" onClick={openNewTaskModal}>
                   <Play size={16} />
                   新建传输任务
                 </Button>
@@ -1040,12 +1098,12 @@ export default function App() {
               <Table>
                 <Table.Header>
                   <Table.Row>
-                    <Table.Head>任务 ID</Table.Head>
-                    <Table.Head>命令</Table.Head>
+                    <Table.Head className="w-[180px]">任务 ID</Table.Head>
+                    <Table.Head className="w-[80px]">命令</Table.Head>
                     <Table.Head>源目录 &rarr; 目标目录</Table.Head>
-                    <Table.Head>传输状态</Table.Head>
-                    <Table.Head>进度 &amp; 速率</Table.Head>
-                    <Table.Head className="text-right">操作</Table.Head>
+                    <Table.Head className="w-[100px]">传输状态</Table.Head>
+                    <Table.Head className="w-[280px]">进度 &amp; 速率</Table.Head>
+                    <Table.Head className="w-[220px] text-right">操作</Table.Head>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -1070,25 +1128,29 @@ export default function App() {
 
                       return (
                         <Table.Row key={task.id}>
-                          <Table.Cell className="font-mono text-xs text-kumo-default">{task.id}</Table.Cell>
-                          <Table.Cell>
+                          <Table.Cell className="w-[180px] font-mono text-xs text-kumo-default truncate" title={task.id}>{task.id}</Table.Cell>
+                          <Table.Cell className="w-[80px]">
                             <Badge variant="outline">{task.command.toUpperCase()}</Badge>
                           </Table.Cell>
-                          <Table.Cell className="text-kumo-default max-w-sm truncate" title={`${task.source} -> ${task.destination}`}>
+                          <Table.Cell className="text-kumo-default truncate" title={`${task.source} -> ${task.destination}`}>
                             <div className="flex flex-col gap-0.5">
                               <span className="truncate font-semibold">{task.source}</span>
                               <span className="truncate text-xs text-kumo-subtle">&rarr; {task.destination}</span>
                             </div>
                           </Table.Cell>
-                          <Table.Cell>{statusBadge}</Table.Cell>
-                          <Table.Cell className="w-64">
+                          <Table.Cell className="w-[100px]">{statusBadge}</Table.Cell>
+                          <Table.Cell className="w-[280px]">
                             {task.status === "running" ? (
-                              <div className="flex flex-col gap-1">
+                              <div className="flex flex-col gap-1 w-full">
                                 <Meter
-                                  label={task.transferred || "传输中"}
+                                  label={task.bytesTransferred || task.transferred || "准备传输..."}
                                   value={task.progress}
                                   showValue={true}
                                 />
+                                <div className="flex justify-between items-center text-xs text-kumo-subtle font-mono">
+                                  <span>文件: {task.filesTransferred || "--"}</span>
+                                  {(task.activeThreads ?? 0) > 0 && <span>线程: {task.activeThreads}</span>}
+                                </div>
                                 <Text variant="secondary" size="xs" as="code">
                                   {task.speed} (ETA: {task.eta})
                                 </Text>
@@ -1098,6 +1160,16 @@ export default function App() {
                                 <Text variant="secondary" size="xs" as="code">
                                   进度: {task.progress}%
                                 </Text>
+                                {task.bytesTransferred && (
+                                  <Text variant="secondary" size="xs">
+                                    总量: {task.bytesTransferred}
+                                  </Text>
+                                )}
+                                {task.filesTransferred && (
+                                  <Text variant="secondary" size="xs">
+                                    文件: {task.filesTransferred}
+                                  </Text>
+                                )}
                                 {task.endTime && (
                                   <Text variant="secondary" size="xs" as="span">
                                     耗时: {
@@ -1110,20 +1182,30 @@ export default function App() {
                               </div>
                             )}
                           </Table.Cell>
-                          <Table.Cell className="text-right">
-                            <div className="flex justify-end gap-2">
+                          <Table.Cell className="w-[220px] text-right">
+                            <div className="flex justify-end gap-1.5 flex-wrap">
                               <Button size="sm" variant="secondary" onClick={() => viewTaskLogs(task)}>
                                 <Eye size={16} />
                                 日志
                               </Button>
-                              {task.status === "running" && (
+                              {task.status === "running" ? (
                                 <Button
                                   size="sm"
                                   variant="secondary-destructive"
                                   onClick={() => stopTask(task.id)}
                                 >
+                                  <Stop size={16} />
                                   停止
                                 </Button>
+                              ) : (
+                                <>
+                                  <Button size="sm" variant="outline" onClick={() => openEditTaskModal(task)}>
+                                    编辑
+                                  </Button>
+                                  <Button size="sm" variant="primary" onClick={() => restartTask(task.id)}>
+                                    重启
+                                  </Button>
+                                </>
                               )}
                             </div>
                           </Table.Cell>
@@ -1252,6 +1334,7 @@ export default function App() {
                 size="sm"
                 value={remoteTypeInput}
                 onValueChange={(val) => setRemoteTypeInput(val as string)}
+                className="w-full"
               >
                 <Select.Option value="sftp">SFTP 连接</Select.Option>
                 <Select.Option value="ftp">FTP 连接</Select.Option>
@@ -1336,13 +1419,16 @@ export default function App() {
         </Dialog.Root>
       )}
 
-      {/* 2. New Task Modal */}
+      {/* 2. New/Edit Task Modal */}
       {isTaskModalOpen && (
-        <Dialog.Root open={isTaskModalOpen} onOpenChange={setIsTaskModalOpen}>
+        <Dialog.Root open={isTaskModalOpen} onOpenChange={(open) => {
+          setIsTaskModalOpen(open);
+          if (!open) setEditingTaskId(null);
+        }}>
           <Dialog className="p-8 max-w-lg w-full">
             <div className="mb-4 flex items-start justify-between gap-4">
               <Dialog.Title className="text-xl font-bold text-kumo-default">
-                启动新传输任务
+                {editingTaskId ? "修改任务配置" : "启动新传输任务"}
               </Dialog.Title>
               <Dialog.Close
                 render={(props) => (
@@ -1352,15 +1438,16 @@ export default function App() {
             </div>
 
             <Dialog.Description className="mb-4 text-kumo-subtle text-sm">
-              创建后台 rclone 命令任务。系统将自动添加 -P 参数以实时显示进度。
+              {editingTaskId ? "修改当前任务配置参数，保存并重新发起该传输任务。" : "创建后台 rclone 命令任务。系统将自动添加 -P 参数以实时显示进度。"}
             </Dialog.Description>
 
-            <div className="flex flex-col gap-3 mt-2">
+            <div className="flex flex-col gap-4 mt-2">
               <Select
                 label="任务操作命令 (Command)"
                 size="sm"
                 value={taskCommand}
                 onValueChange={(val) => setTaskCommand(val as string)}
+                className="w-full"
               >
                 <Select.Option value="copy">Copy (复制 - 跳过目标已存在文件)</Select.Option>
                 <Select.Option value="sync">Sync (同步 - 强一致，目标多余文件会被删除)</Select.Option>
@@ -1401,7 +1488,7 @@ export default function App() {
                 )}
               />
               <Button variant="primary" onClick={launchTask}>
-                启动任务
+                {editingTaskId ? "保存并启动" : "启动任务"}
               </Button>
             </div>
           </Dialog>
@@ -1429,11 +1516,9 @@ export default function App() {
               />
             </div>
 
-            <div className="mt-4 border border-kumo-line rounded-lg overflow-hidden bg-kumo-base h-96 overflow-y-auto">
-              <div className="p-4">
-                <Code.Block code={selectedTask.logs || "等待输出日志..."} lang="bash" />
-                <div ref={logEndRef} />
-              </div>
+            <div className="mt-4 border border-kumo-line rounded-lg bg-[#0d1117] h-96 overflow-y-auto font-mono text-xs text-[#e6edf3] p-4 select-text whitespace-pre-wrap break-all scroll-smooth">
+              {selectedTask.logs || "等待输出日志..."}
+              <div ref={logEndRef} />
             </div>
 
             <div className="mt-6 flex justify-between items-center">

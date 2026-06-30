@@ -109,6 +109,8 @@ func main() {
 	http.HandleFunc("/api/tasks", BasicAuth(handleTasks))
 	http.HandleFunc("/api/tasks/start", BasicAuth(handleTasksStart))
 	http.HandleFunc("/api/tasks/stop", BasicAuth(handleTasksStop))
+	http.HandleFunc("/api/tasks/restart", BasicAuth(handleTasksRestart))
+	http.HandleFunc("/api/tasks/update", BasicAuth(handleTasksUpdate))
 
 	// Frontend files serving
 	var publicFS fs.FS
@@ -516,4 +518,85 @@ func handleRcloneUpload(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Successfully uploaded Rclone binary"))
+}
+
+func handleTasksRestart(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "OPTIONS" {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "id parameter required", http.StatusBadRequest)
+		return
+	}
+
+	if err := RestartTask(id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status":"started"}`))
+}
+
+func handleTasksUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "OPTIONS" {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ID          string   `json:"id"`
+		Command     string   `json:"command"`
+		Source      string   `json:"source"`
+		Destination string   `json:"destination"`
+		Flags       []string `json:"flags"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	tasksLock.Lock()
+	t, ok := tasks[req.ID]
+	if ok {
+		if t.Status == "running" {
+			tasksLock.Unlock()
+			http.Error(w, "Cannot modify a running task", http.StatusBadRequest)
+			return
+		}
+		t.Command = req.Command
+		t.Source = req.Source
+		t.Destination = req.Destination
+		t.Flags = req.Flags
+		saveTasks()
+	}
+	tasksLock.Unlock()
+
+	if !ok {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status":"updated"}`))
 }
