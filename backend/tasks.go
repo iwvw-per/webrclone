@@ -15,24 +15,26 @@ import (
 )
 
 type Task struct {
-	ID               string    `json:"id"`
-	Command          string    `json:"command"`
-	Source           string    `json:"source"`
-	Destination      string    `json:"destination"`
-	Flags            []string  `json:"flags"`
-	Status           string    `json:"status"` // running, success, failed, stopped
-	Progress         float64   `json:"progress"`
-	Speed            string    `json:"speed"`
-	ETA              string    `json:"eta"`
-	Transferred      string    `json:"transferred"`
-	BytesTransferred string    `json:"bytesTransferred"`
-	FilesTransferred string    `json:"filesTransferred"`
-	ActiveThreads    int       `json:"activeThreads"`
-	ActiveFiles      []string  `json:"activeFiles"`
-	Logs             string    `json:"logs"`
-	StartTime        string    `json:"startTime"`
-	EndTime          string    `json:"endTime"`
-	cmd              *exec.Cmd `json:"-"`
+	ID                  string    `json:"id"`
+	Command             string    `json:"command"`
+	Source              string    `json:"source"`
+	Destination         string    `json:"destination"`
+	Flags               []string  `json:"flags"`
+	Status              string    `json:"status"` // running, success, failed, stopped
+	Progress            float64   `json:"progress"`
+	Speed               string    `json:"speed"`
+	ETA                 string    `json:"eta"`
+	Transferred         string    `json:"transferred"`
+	BytesTransferred    string    `json:"bytesTransferred"`
+	FilesTransferred    string    `json:"filesTransferred"`
+	ActiveThreads       int       `json:"activeThreads"`
+	ActiveFiles         []string  `json:"activeFiles"`
+	Logs                string    `json:"logs"`
+	ProgressLog         string    `json:"progressLog"`
+	StartTime           string    `json:"startTime"`
+	EndTime             string    `json:"endTime"`
+	cmd                 *exec.Cmd `json:"-"`
+	lastNormalSpeedTime time.Time `json:"-"`
 }
 
 var (
@@ -193,6 +195,7 @@ func RestartTask(id string) error {
 	task.Transferred = ""
 	task.BytesTransferred = ""
 	task.FilesTransferred = ""
+	task.ProgressLog = ""
 	task.ActiveFiles = nil
 	task.ActiveThreads = 0
 	task.StartTime = time.Now().Format(time.RFC3339)
@@ -205,6 +208,7 @@ func RestartTask(id string) error {
 }
 
 func runTaskProcess(task *Task) error {
+	task.lastNormalSpeedTime = time.Now()
 	rclonePath, err := GetRclonePath()
 	if err != nil {
 		return err
@@ -253,7 +257,7 @@ func runTaskProcess(task *Task) error {
 	pctReg := regexp.MustCompile(`(\d+)%`)
 	speedReg := regexp.MustCompile(`(\d+(?:\.\d+)?\s*[a-zA-Z]+/s)`)
 	etaReg := regexp.MustCompile(`ETA\s*(\S+)`)
-	transReg := regexp.MustCompile(`Transferred:\s*(\d+\s*/\s*\d+|\S+\s*/\s*\S+)`)
+	transReg := regexp.MustCompile(`Transferred:\s*([^,]+)`)
 
 	go func() {
 		reader := io.Reader(stdout)
@@ -265,6 +269,7 @@ func runTaskProcess(task *Task) error {
 			logLines = strings.Split(task.Logs, "\n")
 		}
 		var activeFiles []string
+		var currentProgressLines []string
 
 		for scanner.Scan() {
 			text := scanner.Text()
@@ -273,16 +278,28 @@ func runTaskProcess(task *Task) error {
 				continue
 			}
 
-			// Filter out repeating progress lines from persistent logs
+			// Parse progress info
 			isProgressLine := strings.Contains(cleanText, "Transferred:") ||
 				strings.Contains(cleanText, "Checks:") ||
 				strings.Contains(cleanText, "Elapsed time:") ||
 				strings.Contains(cleanText, "Transferring:") ||
 				strings.HasPrefix(cleanText, "* ")
 
-			if !isProgressLine {
+			if isProgressLine {
+				// If we encounter a block header or a Transfers header, flush current progress buffer to ProgressLog
+				if strings.Contains(cleanText, "Transferring:") || strings.Contains(cleanText, "Transferred:") {
+					if len(currentProgressLines) > 0 {
+						tasksLock.Lock()
+						task.ProgressLog = strings.Join(currentProgressLines, "\n")
+						tasksLock.Unlock()
+					}
+					currentProgressLines = []string{cleanText}
+				} else {
+					currentProgressLines = append(currentProgressLines, cleanText)
+				}
+			} else {
 				logLines = append(logLines, cleanText)
-				if len(logLines) > 2000 {
+				if len(logLines) > 1000 {
 					logLines = logLines[1:]
 				}
 			}
@@ -302,8 +319,36 @@ func runTaskProcess(task *Task) error {
 				// Parse speed
 				speedMatch := speedReg.FindStringSubmatch(cleanText)
 				if len(speedMatch) > 1 {
+					sVal := speedMatch[1]
 					tasksLock.Lock()
-					task.Speed = speedMatch[1]
+					task.Speed = sVal
+
+					// Auto-restart on low speed logic
+					bytesPerSec := parseSpeedToBytes(sVal)
+					// Threshold: 10 KB/s. If speed is >= 10 KB/s, refresh the timer
+					if bytesPerSec >= 10240 {
+						task.lastNormalSpeedTime = time.Now()
+					} else {
+						// Speed is low. Check if it has been low for too long (e.g. 150 seconds = 2.5 minutes)
+						// Only trigger if task has been running for at least 60 seconds to allow ramp up
+						startTime, parseErr := time.Parse(time.RFC3339, task.StartTime)
+						if parseErr == nil && time.Since(startTime) > 60*time.Second {
+							if time.Since(task.lastNormalSpeedTime) > 150*time.Second {
+								// Refresh timer to prevent duplicate triggers
+								task.lastNormalSpeedTime = time.Now()
+								
+								// Trigger auto-restart asynchronously
+								go func(tid string) {
+									// Stop the task first
+									_ = StopTask(tid)
+									// Wait a moment for process exit
+									time.Sleep(3 * time.Second)
+									// Restart it
+									_ = RestartTask(tid)
+								}(task.ID)
+							}
+						}
+					}
 					tasksLock.Unlock()
 				}
 
@@ -366,4 +411,37 @@ func runTaskProcess(task *Task) error {
 	}()
 
 	return nil
+}
+func parseSpeedToBytes(speedStr string) float64 {
+	speedStr = strings.ToLower(strings.TrimSpace(speedStr))
+	if speedStr == "" {
+		return 0
+	}
+	var numStr string
+	var unitStr string
+	for i, c := range speedStr {
+		if (c >= '0' && c <= '9') || c == '.' {
+			numStr += string(c)
+		} else {
+			unitStr = strings.TrimSpace(speedStr[i:])
+			break
+		}
+	}
+	val, err := strconv.ParseFloat(numStr, 64)
+	if err != nil {
+		return 0
+	}
+	unitStr = strings.TrimSuffix(unitStr, "/s")
+	unitStr = strings.TrimSpace(unitStr)
+
+	switch {
+	case strings.Contains(unitStr, "g"): // GiB, GB
+		return val * 1024 * 1024 * 1024
+	case strings.Contains(unitStr, "m"): // MiB, MB
+		return val * 1024 * 1024
+	case strings.Contains(unitStr, "k"): // KiB, KB
+		return val * 1024
+	default:
+		return val
+	}
 }

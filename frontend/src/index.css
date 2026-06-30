@@ -15,7 +15,8 @@ body {
 }
 
 /* Custom dialog overlay override to prevent washing out the background */
-div.fixed.inset-0.bg-kumo-recessed {
+div[class*="bg-kumo-recessed"] {
   background-color: rgba(0, 0, 0, 0.45) !important;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px) !important;
+  opacity: 1 !important;
 }

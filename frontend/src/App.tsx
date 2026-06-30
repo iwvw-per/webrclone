@@ -38,7 +38,12 @@ import {
 const renderFormattedLogs = (logs: string) => {
   if (!logs) return <span style={{ color: "#9ca3af" }}>等待输出日志...</span>;
   
-  return logs.split("\n").map((line, idx) => {
+  // Split on either \n or \r to handle any carriage returns in the logs
+  const lines = logs.split(/\r?\n|\r/);
+  
+  return lines.map((line, idx) => {
+    if (line.trim() === "" && idx === lines.length - 1) return null;
+    
     let color = "#e6edf3";
     let fontWeight: "normal" | "bold" = "normal";
     
@@ -50,7 +55,7 @@ const renderFormattedLogs = (logs: string) => {
       fontWeight = "bold";
     } else if (line.includes("INFO")) {
       color = "#60a5fa"; // Blue-400
-    } else if (line.startsWith("[System]")) {
+    } else if (line.startsWith("[System]") || line.startsWith("[实时传输详情]")) {
       color = "#34d399"; // Emerald-400
       fontWeight = "bold";
     }
@@ -79,6 +84,7 @@ interface Task {
   activeThreads?: number;
   activeFiles: string[];
   logs: string;
+  progressLog?: string;
   startTime: string;
   endTime: string;
 }
@@ -533,6 +539,9 @@ function AppContent() {
     }
 
     const flagsArr = taskFlags.trim() ? taskFlags.trim().split(/\s+/) : [];
+    
+    // Remember custom flags in localStorage
+    localStorage.setItem("last_task_flags", taskFlags.trim());
 
     if (editingTaskId) {
       apiFetch("/api/tasks/update", {
@@ -624,7 +633,8 @@ function AppContent() {
     setTaskCommand("copy");
     setTaskSource("");
     setTaskDest("");
-    setTaskFlags("");
+    const savedFlags = localStorage.getItem("last_task_flags");
+    setTaskFlags(savedFlags || "");
     setIsTaskModalOpen(true);
   };
 
@@ -1156,13 +1166,13 @@ function AppContent() {
                           <Table.Cell style={{ width: "8%", textAlign: "center" }}>{statusBadge}</Table.Cell>
                           <Table.Cell style={{ width: "18%", textAlign: "center" }}>
                             {task.status === "running" ? (
-                              <div className="flex flex-col gap-1 w-full">
+                              <div className="flex flex-col w-full" style={{ gap: "2px" }}>
                                 <Meter
-                                  label={task.bytesTransferred || task.transferred || "准备传输..."}
+                                  label={task.bytesTransferred || "准备传输..."}
                                   value={task.progress}
                                   showValue={true}
                                 />
-                                <div className="flex justify-between items-center text-xs text-kumo-subtle font-mono">
+                                <div className="flex justify-between items-center text-kumo-subtle font-mono w-full px-1" style={{ fontSize: "11px", marginTop: "2px" }}>
                                   <span>文件: {task.filesTransferred || "--"}</span>
                                   {(task.activeThreads ?? 0) > 0 && <span>线程: {task.activeThreads}</span>}
                                 </div>
@@ -1491,13 +1501,54 @@ function AppContent() {
                 placeholder="例如: gd-drive:/backup_destination 或 E:\target"
               />
 
-              <Input
-                label="自定义命令行参数 (例如 --dry-run)"
-                size="sm"
-                value={taskFlags}
-                onChange={(e) => setTaskFlags(e.target.value)}
-                placeholder="例如: --transfers=4 --ignore-existing --exclude *.tmp"
-              />
+              <div>
+                <Input
+                  label="自定义命令行参数 (例如 --dry-run)"
+                  size="sm"
+                  value={taskFlags}
+                  onChange={(e) => setTaskFlags(e.target.value)}
+                  placeholder="例如: --transfers=4 --ignore-existing --exclude *.tmp"
+                />
+                
+                {/* Presets List */}
+                <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+                  <span className="text-xs text-kumo-subtle mr-1">快捷预设:</span>
+                  {[
+                    { label: "测试运行", value: "--dry-run" },
+                    { label: "跳过已存在", value: "--ignore-existing" },
+                    { label: "并发数=4", value: "--transfers=4" },
+                    { label: "并发数=8", value: "--transfers=8" },
+                    { label: "更新较新文件", value: "--update" },
+                    { label: "排除临时文件", value: "--exclude *.tmp" }
+                  ].map((preset) => {
+                    const isSelected = taskFlags.includes(preset.value);
+                    return (
+                      <span
+                        key={preset.value}
+                        className="cursor-pointer inline-flex"
+                        onClick={() => {
+                          let current = taskFlags.trim();
+                          if (isSelected) {
+                            // Remove preset
+                            current = current.replace(preset.value, "").replace(/\s+/g, " ").trim();
+                          } else {
+                            // Append preset
+                            current = current ? `${current} ${preset.value}` : preset.value;
+                          }
+                          setTaskFlags(current);
+                        }}
+                      >
+                        <Badge
+                          variant={isSelected ? "info" : "outline"}
+                          className="hover:bg-kumo-fill transition-colors"
+                        >
+                          {preset.label}
+                        </Badge>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             <div className="mt-6 flex justify-end gap-2">
@@ -1519,7 +1570,7 @@ function AppContent() {
       {/* 3. Real-Time Task Logs Modal */}
       {isLogsModalOpen && selectedTask && (
         <Dialog.Root open={isLogsModalOpen} onOpenChange={setIsLogsModalOpen}>
-          <Dialog className="p-8 max-w-5xl w-full">
+          <Dialog className="p-8" size="xl" style={{ width: "950px", maxWidth: "95vw" }}>
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <Dialog.Title className="text-xl font-bold text-kumo-default">
@@ -1610,12 +1661,20 @@ function AppContent() {
               </Grid>
             </LayerCard>
 
-            <div
-              className="mt-4 border border-kumo-line rounded-lg overflow-auto scroll-smooth p-4"
-              style={{ backgroundColor: "#0d1117", height: "350px", fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace", fontSize: "12px", lineHeight: "1.6" }}
-            >
-              {renderFormattedLogs(selectedTask.logs)}
-              <div ref={logEndRef} />
+            {/* Single Unified Logs Console */}
+            <div className="mt-4">
+              <Text variant="secondary" size="xs">任务运行控制台日志</Text>
+              <div
+                className="mt-1 border border-kumo-line rounded-lg overflow-auto scroll-smooth p-4"
+                style={{ backgroundColor: "#0d1117", height: "420px", fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace", fontSize: "12px", lineHeight: "1.6" }}
+              >
+                {renderFormattedLogs(
+                  selectedTask.status === "running"
+                    ? `${selectedTask.logs}\n\n[实时传输详情]\n${selectedTask.progressLog || "正在获取实时传输详情..."}`
+                    : selectedTask.logs
+                )}
+                <div ref={logEndRef} />
+              </div>
             </div>
 
             <div className="mt-6 flex justify-between items-center">
