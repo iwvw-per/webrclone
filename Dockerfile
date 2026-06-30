@@ -1,5 +1,5 @@
 # Stage 1: Build React Frontend
-FROM node:18-alpine AS frontend-builder
+FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 COPY frontend/package*.json ./
 COPY frontend/libs/ ./libs/
