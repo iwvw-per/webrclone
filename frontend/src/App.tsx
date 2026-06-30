@@ -287,7 +287,7 @@ export default function App() {
             }, 100);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }, 1500);
 
     return () => clearInterval(interval);
@@ -321,7 +321,7 @@ export default function App() {
           setDownloadStatus(data.downloadStatus);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const fetchConfigPath = () => {
@@ -330,7 +330,7 @@ export default function App() {
       .then((data) => {
         if (data) setConfigPath(data.path);
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const saveConfigPath = () => {
@@ -347,7 +347,7 @@ export default function App() {
           showNotification("error", "保存配置文件路径失败！");
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const fetchRemotes = () => {
@@ -356,7 +356,7 @@ export default function App() {
       .then((data) => {
         if (data) setRemotes(data);
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const fetchRawConfig = () => {
@@ -368,7 +368,7 @@ export default function App() {
           setIsEditingRaw(true);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const saveRawConfig = () => {
@@ -386,7 +386,7 @@ export default function App() {
           showNotification("error", "保存原始配置文件失败！");
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const fetchTasks = () => {
@@ -400,7 +400,7 @@ export default function App() {
           setTasks(sorted);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   // Download Rclone Binary Trigger
@@ -414,7 +414,7 @@ export default function App() {
           showNotification("error", "触发主程序下载失败！");
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   // Remote Config Save
@@ -445,7 +445,7 @@ export default function App() {
           showNotification("error", "保存远程存储配置失败！");
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const deleteRemote = (name: string) => {
@@ -460,7 +460,7 @@ export default function App() {
           showNotification("error", "删除存储配置失败！");
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const openEditRemote = (name: string, type: string, params: { [key: string]: string }) => {
@@ -520,7 +520,7 @@ export default function App() {
             showNotification("error", "更新任务配置失败！");
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     } else {
       apiFetch("/api/tasks/start", {
         method: "POST",
@@ -545,7 +545,7 @@ export default function App() {
             showNotification("error", "启动传输任务失败！");
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   };
 
@@ -559,7 +559,7 @@ export default function App() {
           showNotification("error", "重新启动任务失败！");
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const stopTask = (id: string) => {
@@ -572,7 +572,7 @@ export default function App() {
           showNotification("error", "发送停止任务指令失败！");
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const openEditTaskModal = (task: Task) => {
@@ -713,12 +713,6 @@ export default function App() {
                 WebRclone
               </Text>
             </div>
-            <div className="flex gap-1 items-center">
-              <Badge variant="success">管理员</Badge>
-              <Badge variant="outline" className="text-xs">
-                Kumo UI
-              </Badge>
-            </div>
           </div>
 
           {/* Nav Items */}
@@ -807,7 +801,7 @@ export default function App() {
                     <div className="flex flex-col">
                       <Text variant="secondary" size="xs">Rclone 主程序</Text>
                       <div className="truncate max-w-[140px] font-mono mt-1">
-                        <Text variant="heading3" as="span" title={rcloneVersion}>
+                        <Text variant="heading2" as="span" title={rcloneVersion}>
                           {rcloneVersion}
                         </Text>
                       </div>
@@ -1009,13 +1003,13 @@ export default function App() {
 
             {/* Remotes Table list */}
             <LayerCard className="p-0 overflow-hidden border border-kumo-line rounded-lg">
-              <Table className="w-full table-fixed">
+              <Table className="w-full" style={{ tableLayout: "fixed" }}>
                 <Table.Header>
                   <Table.Row>
-                    <Table.Head className="w-[180px] text-left">存储源名称</Table.Head>
-                    <Table.Head className="w-[120px] text-left">存储类型 (Type)</Table.Head>
-                    <Table.Head className="text-left">配置参数明细</Table.Head>
-                    <Table.Head className="w-[160px] text-right">操作</Table.Head>
+                    <Table.Head style={{ width: "180px", textAlign: "left" }}>存储源名称</Table.Head>
+                    <Table.Head style={{ width: "120px", textAlign: "left" }}>存储类型 (Type)</Table.Head>
+                    <Table.Head style={{ textAlign: "left" }}>配置参数明细</Table.Head>
+                    <Table.Head style={{ width: "160px", textAlign: "right" }}>操作</Table.Head>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -1036,14 +1030,14 @@ export default function App() {
 
                       return (
                         <Table.Row key={name}>
-                          <Table.Cell className="w-[180px] text-left font-semibold text-kumo-default truncate" title={name}>{name}</Table.Cell>
-                          <Table.Cell className="w-[120px] text-left">
+                          <Table.Cell style={{ width: "180px", textAlign: "left" }} className="font-semibold text-kumo-default truncate" title={name}>{name}</Table.Cell>
+                          <Table.Cell style={{ width: "120px", textAlign: "left" }}>
                             <Badge variant="primary">{type}</Badge>
                           </Table.Cell>
-                          <Table.Cell className="text-left truncate font-mono text-xs">
+                          <Table.Cell style={{ textAlign: "left" }} className="truncate font-mono text-xs">
                             {paramsText || "—"}
                           </Table.Cell>
-                          <Table.Cell className="w-[160px] text-right">
+                          <Table.Cell style={{ width: "160px", textAlign: "right" }}>
                             <div className="flex justify-end gap-2">
                               <Button
                                 size="sm"
@@ -1076,7 +1070,7 @@ export default function App() {
           <div className="flex flex-col gap-4">
             <div className="flex justify-between items-start">
               <div>
-                <Text variant="heading2" as="h2">后台数据传输任务 (Tasks)</Text>
+                <Text variant="heading2" as="h2">后台数据传输任务</Text>
                 <Text variant="secondary">
                   启动 rclone copy/sync/move 批量传输任务，并实时查看每个任务的状态和百分比。
                 </Text>
@@ -1098,18 +1092,18 @@ export default function App() {
               <Table className="w-full table-fixed">
                 <Table.Header>
                   <Table.Row>
-                    <Table.Head className="w-[160px] text-left">任务 ID</Table.Head>
-                    <Table.Head className="w-[80px] text-left">命令</Table.Head>
-                    <Table.Head className="text-left">源目录 &rarr; 目标目录</Table.Head>
-                    <Table.Head className="w-[100px] text-left">传输状态</Table.Head>
-                    <Table.Head className="w-[260px] text-left">进度 &amp; 速率</Table.Head>
-                    <Table.Head className="w-[200px] text-right">操作</Table.Head>
+                    <Table.Head className="w-[30px] text-center">任务 ID</Table.Head>
+                    <Table.Head className="w-[30px] text-center">命令</Table.Head>
+                    <Table.Head className="text-center">源目录 &rarr; 目标目录</Table.Head>
+                    <Table.Head className="w-[80px] text-center">传输状态</Table.Head>
+                    <Table.Head className="w-[200px] text-center">进度 &amp; 速率</Table.Head>
+                    <Table.Head className="w-[120px] text-center">操作</Table.Head>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
                   {tasks.length === 0 ? (
                     <Table.Row>
-                      <Table.Cell colSpan={6} className="text-center py-8 text-kumo-subtle">
+                      <Table.Cell colSpan={7} className="text-center py-8 text-kumo-subtle">
                         当前暂无任何传输任务历史。您可以点击右上角“新建传输任务”。
                       </Table.Cell>
                     </Table.Row>
@@ -1128,18 +1122,18 @@ export default function App() {
 
                       return (
                         <Table.Row key={task.id}>
-                          <Table.Cell className="w-[160px] text-left font-mono text-xs text-kumo-default truncate" title={task.id}>{task.id}</Table.Cell>
-                          <Table.Cell className="w-[80px] text-left">
+                          <Table.Cell className="w-[160px] text-center font-mono text-xs text-kumo-default truncate" title={task.id}>{task.id}</Table.Cell>
+                          <Table.Cell className="w-[80px] text-center">
                             <Badge variant="outline">{task.command.toUpperCase()}</Badge>
                           </Table.Cell>
-                          <Table.Cell className="text-left truncate" title={`${task.source} -> ${task.destination}`}>
+                          <Table.Cell className="text-center truncate" title={`${task.source} -> ${task.destination}`}>
                             <div className="flex flex-col gap-0.5">
                               <span className="truncate font-semibold">{task.source}</span>
                               <span className="truncate text-xs text-kumo-subtle">&rarr; {task.destination}</span>
                             </div>
                           </Table.Cell>
-                          <Table.Cell className="w-[100px] text-left">{statusBadge}</Table.Cell>
-                          <Table.Cell className="w-[260px] text-left">
+                          <Table.Cell className="w-[100px] text-center">{statusBadge}</Table.Cell>
+                          <Table.Cell className="w-[180px] text-center">
                             {task.status === "running" ? (
                               <div className="flex flex-col gap-1 w-full">
                                 <Meter
@@ -1182,8 +1176,8 @@ export default function App() {
                               </div>
                             )}
                           </Table.Cell>
-                          <Table.Cell className="w-[200px] text-right">
-                            <div className="flex justify-end gap-1.5 flex-wrap">
+                          <Table.Cell className="w-[200px] text-center">
+                            <div className="flex justify-center gap-1.5 flex-wrap">
                               <Button size="sm" variant="secondary" onClick={() => viewTaskLogs(task)}>
                                 <Eye size={16} />
                                 日志
@@ -1233,7 +1227,7 @@ export default function App() {
               <GridItem>
                 <LayerCard className="p-6 flex flex-col gap-4 border border-kumo-line rounded-lg">
                   <Text variant="heading3" as="h3">状态与操作</Text>
-                  
+
                   <div className="flex flex-col gap-2">
                     <div className="flex justify-between border-b border-kumo-line pb-2">
                       <Text variant="secondary">当前可用路径</Text>
@@ -1256,7 +1250,7 @@ export default function App() {
                       <Download size={16} />
                       {rcloneVersion === "Not Installed" ? "下载并安装 Rclone" : "检查并更新至最新版"}
                     </Button>
-                    
+
                     <input
                       type="file"
                       ref={fileInputRef}
@@ -1516,7 +1510,10 @@ export default function App() {
               />
             </div>
 
-            <div className="mt-4 border border-kumo-line rounded-lg bg-[#0d1117] h-96 overflow-y-auto font-mono text-xs text-[#e6edf3] p-4 select-text whitespace-pre-wrap break-all scroll-smooth">
+            <div
+              className="mt-4 border border-kumo-line rounded-lg overflow-y-auto font-mono text-xs p-4 select-text whitespace-pre-wrap break-all scroll-smooth bg-[#0d1117]"
+              style={{ backgroundColor: "#0d1117", height: "384px", color: "#e6edf3" }}
+            >
               {selectedTask.logs || "等待输出日志..."}
               <div ref={logEndRef} />
             </div>
