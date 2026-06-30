@@ -1089,15 +1089,16 @@ export default function App() {
 
             {/* Task list table */}
             <LayerCard className="p-0 overflow-hidden border border-kumo-line rounded-lg">
-              <Table className="w-full table-fixed">
+              <Table className="w-full" style={{ tableLayout: "fixed" }}>
                 <Table.Header>
                   <Table.Row>
-                    <Table.Head className="w-[30px] text-center">任务 ID</Table.Head>
-                    <Table.Head className="w-[30px] text-center">命令</Table.Head>
-                    <Table.Head className="text-center">源目录 &rarr; 目标目录</Table.Head>
-                    <Table.Head className="w-[80px] text-center">传输状态</Table.Head>
-                    <Table.Head className="w-[200px] text-center">进度 &amp; 速率</Table.Head>
-                    <Table.Head className="w-[120px] text-center">操作</Table.Head>
+                    <Table.Head style={{ width: "150px", textAlign: "left" }}>任务 ID</Table.Head>
+                    <Table.Head style={{ width: "70px", textAlign: "left" }}>命令</Table.Head>
+                    <Table.Head style={{ textAlign: "left" }}>源目录 &rarr; 目标目录</Table.Head>
+                    <Table.Head style={{ width: "90px", textAlign: "left" }}>传输状态</Table.Head>
+                    <Table.Head style={{ width: "240px", textAlign: "left" }}>进度</Table.Head>
+                    <Table.Head style={{ width: "160px", textAlign: "left" }}>传输速率</Table.Head>
+                    <Table.Head style={{ width: "200px", textAlign: "right" }}>操作</Table.Head>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -1122,18 +1123,19 @@ export default function App() {
 
                       return (
                         <Table.Row key={task.id}>
-                          <Table.Cell className="w-[160px] text-center font-mono text-xs text-kumo-default truncate" title={task.id}>{task.id}</Table.Cell>
-                          <Table.Cell className="w-[80px] text-center">
+                          <Table.Cell style={{ width: "150px", textAlign: "left" }} className="font-mono text-xs text-kumo-default truncate" title={task.id}>{task.id}</Table.Cell>
+                          <Table.Cell style={{ width: "70px", textAlign: "left" }}>
                             <Badge variant="outline">{task.command.toUpperCase()}</Badge>
                           </Table.Cell>
-                          <Table.Cell className="text-center truncate" title={`${task.source} -> ${task.destination}`}>
-                            <div className="flex flex-col gap-0.5">
-                              <span className="truncate font-semibold">{task.source}</span>
-                              <span className="truncate text-xs text-kumo-subtle">&rarr; {task.destination}</span>
+                          <Table.Cell style={{ textAlign: "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={`${task.source} → ${task.destination}`}>
+                            <div className="font-mono text-xs text-kumo-default flex items-center gap-1" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              <span className="font-semibold">{task.source}</span>
+                              <span className="text-kumo-subtle">&rarr;</span>
+                              <span className="text-kumo-subtle">{task.destination}</span>
                             </div>
                           </Table.Cell>
-                          <Table.Cell className="w-[100px] text-center">{statusBadge}</Table.Cell>
-                          <Table.Cell className="w-[180px] text-center">
+                          <Table.Cell style={{ width: "90px", textAlign: "left" }}>{statusBadge}</Table.Cell>
+                          <Table.Cell style={{ width: "240px", textAlign: "left" }}>
                             {task.status === "running" ? (
                               <div className="flex flex-col gap-1 w-full">
                                 <Meter
@@ -1145,27 +1147,33 @@ export default function App() {
                                   <span>文件: {task.filesTransferred || "--"}</span>
                                   {(task.activeThreads ?? 0) > 0 && <span>线程: {task.activeThreads}</span>}
                                 </div>
-                                <Text variant="secondary" size="xs" as="code">
-                                  {task.speed} (ETA: {task.eta})
-                                </Text>
                               </div>
                             ) : (
                               <div className="flex flex-col gap-1">
                                 <div className="font-mono text-xs text-kumo-subtle">
                                   进度: {task.progress}%
                                 </div>
-                                {task.bytesTransferred && (
-                                  <div className="text-xs text-kumo-subtle mt-0.5">
-                                    总量: {task.bytesTransferred}
-                                  </div>
-                                )}
                                 {task.filesTransferred && (
                                   <div className="text-xs text-kumo-subtle mt-0.5">
                                     文件: {task.filesTransferred}
                                   </div>
                                 )}
+                              </div>
+                            )}
+                          </Table.Cell>
+                          <Table.Cell style={{ width: "160px", textAlign: "left" }}>
+                            {task.status === "running" ? (
+                              <div className="flex flex-col gap-0.5 font-mono text-xs text-kumo-default">
+                                <span className="font-semibold">{task.speed || "--"}</span>
+                                <span className="text-kumo-subtle">ETA: {task.eta || "--"}</span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col gap-0.5 font-mono text-xs text-kumo-subtle">
+                                {task.bytesTransferred && (
+                                  <div>总量: {task.bytesTransferred}</div>
+                                )}
                                 {task.endTime && (
-                                  <div className="text-xs text-kumo-subtle mt-0.5">
+                                  <div className="mt-0.5">
                                     耗时: {
                                       Math.round(
                                         (new Date(task.endTime).getTime() - new Date(task.startTime).getTime()) / 1000
@@ -1176,8 +1184,8 @@ export default function App() {
                               </div>
                             )}
                           </Table.Cell>
-                          <Table.Cell className="w-[200px] text-center">
-                            <div className="flex justify-center gap-1.5 flex-wrap">
+                          <Table.Cell style={{ width: "200px", textAlign: "right" }}>
+                            <div className="flex justify-end gap-1.5 flex-wrap">
                               <Button size="sm" variant="secondary" onClick={() => viewTaskLogs(task)}>
                                 <Eye size={16} />
                                 日志
