@@ -1009,13 +1009,13 @@ export default function App() {
 
             {/* Remotes Table list */}
             <LayerCard className="p-0 overflow-hidden border border-kumo-line rounded-lg">
-              <Table>
+              <Table className="w-full table-fixed">
                 <Table.Header>
                   <Table.Row>
-                    <Table.Head>存储源名称</Table.Head>
-                    <Table.Head>存储类型 (Type)</Table.Head>
-                    <Table.Head>配置参数明细</Table.Head>
-                    <Table.Head className="text-right">操作</Table.Head>
+                    <Table.Head className="w-[180px] text-left">存储源名称</Table.Head>
+                    <Table.Head className="w-[120px] text-left">存储类型 (Type)</Table.Head>
+                    <Table.Head className="text-left">配置参数明细</Table.Head>
+                    <Table.Head className="w-[160px] text-right">操作</Table.Head>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -1036,14 +1036,14 @@ export default function App() {
 
                       return (
                         <Table.Row key={name}>
-                          <Table.Cell className="font-semibold text-kumo-default">{name}</Table.Cell>
-                          <Table.Cell>
+                          <Table.Cell className="w-[180px] text-left font-semibold text-kumo-default truncate" title={name}>{name}</Table.Cell>
+                          <Table.Cell className="w-[120px] text-left">
                             <Badge variant="primary">{type}</Badge>
                           </Table.Cell>
-                          <Table.Cell className="text-kumo-subtle truncate max-w-md font-mono text-xs">
+                          <Table.Cell className="text-left truncate font-mono text-xs">
                             {paramsText || "—"}
                           </Table.Cell>
-                          <Table.Cell className="text-right">
+                          <Table.Cell className="w-[160px] text-right">
                             <div className="flex justify-end gap-2">
                               <Button
                                 size="sm"
@@ -1095,15 +1095,15 @@ export default function App() {
 
             {/* Task list table */}
             <LayerCard className="p-0 overflow-hidden border border-kumo-line rounded-lg">
-              <Table>
+              <Table className="w-full table-fixed">
                 <Table.Header>
                   <Table.Row>
-                    <Table.Head className="w-[180px]">任务 ID</Table.Head>
-                    <Table.Head className="w-[80px]">命令</Table.Head>
-                    <Table.Head>源目录 &rarr; 目标目录</Table.Head>
-                    <Table.Head className="w-[100px]">传输状态</Table.Head>
-                    <Table.Head className="w-[280px]">进度 &amp; 速率</Table.Head>
-                    <Table.Head className="w-[220px] text-right">操作</Table.Head>
+                    <Table.Head className="w-[160px] text-left">任务 ID</Table.Head>
+                    <Table.Head className="w-[80px] text-left">命令</Table.Head>
+                    <Table.Head className="text-left">源目录 &rarr; 目标目录</Table.Head>
+                    <Table.Head className="w-[100px] text-left">传输状态</Table.Head>
+                    <Table.Head className="w-[260px] text-left">进度 &amp; 速率</Table.Head>
+                    <Table.Head className="w-[200px] text-right">操作</Table.Head>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -1128,18 +1128,18 @@ export default function App() {
 
                       return (
                         <Table.Row key={task.id}>
-                          <Table.Cell className="w-[180px] font-mono text-xs text-kumo-default truncate" title={task.id}>{task.id}</Table.Cell>
-                          <Table.Cell className="w-[80px]">
+                          <Table.Cell className="w-[160px] text-left font-mono text-xs text-kumo-default truncate" title={task.id}>{task.id}</Table.Cell>
+                          <Table.Cell className="w-[80px] text-left">
                             <Badge variant="outline">{task.command.toUpperCase()}</Badge>
                           </Table.Cell>
-                          <Table.Cell className="text-kumo-default truncate" title={`${task.source} -> ${task.destination}`}>
+                          <Table.Cell className="text-left truncate" title={`${task.source} -> ${task.destination}`}>
                             <div className="flex flex-col gap-0.5">
                               <span className="truncate font-semibold">{task.source}</span>
                               <span className="truncate text-xs text-kumo-subtle">&rarr; {task.destination}</span>
                             </div>
                           </Table.Cell>
-                          <Table.Cell className="w-[100px]">{statusBadge}</Table.Cell>
-                          <Table.Cell className="w-[280px]">
+                          <Table.Cell className="w-[100px] text-left">{statusBadge}</Table.Cell>
+                          <Table.Cell className="w-[260px] text-left">
                             {task.status === "running" ? (
                               <div className="flex flex-col gap-1 w-full">
                                 <Meter
@@ -1157,32 +1157,32 @@ export default function App() {
                               </div>
                             ) : (
                               <div className="flex flex-col gap-1">
-                                <Text variant="secondary" size="xs" as="code">
+                                <div className="font-mono text-xs text-kumo-subtle">
                                   进度: {task.progress}%
-                                </Text>
+                                </div>
                                 {task.bytesTransferred && (
-                                  <Text variant="secondary" size="xs">
+                                  <div className="text-xs text-kumo-subtle mt-0.5">
                                     总量: {task.bytesTransferred}
-                                  </Text>
+                                  </div>
                                 )}
                                 {task.filesTransferred && (
-                                  <Text variant="secondary" size="xs">
+                                  <div className="text-xs text-kumo-subtle mt-0.5">
                                     文件: {task.filesTransferred}
-                                  </Text>
+                                  </div>
                                 )}
                                 {task.endTime && (
-                                  <Text variant="secondary" size="xs" as="span">
+                                  <div className="text-xs text-kumo-subtle mt-0.5">
                                     耗时: {
                                       Math.round(
                                         (new Date(task.endTime).getTime() - new Date(task.startTime).getTime()) / 1000
                                       )
                                     } 秒
-                                  </Text>
+                                  </div>
                                 )}
                               </div>
                             )}
                           </Table.Cell>
-                          <Table.Cell className="w-[220px] text-right">
+                          <Table.Cell className="w-[200px] text-right">
                             <div className="flex justify-end gap-1.5 flex-wrap">
                               <Button size="sm" variant="secondary" onClick={() => viewTaskLogs(task)}>
                                 <Eye size={16} />
