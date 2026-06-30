@@ -34,6 +34,35 @@ import {
 } from "@phosphor-icons/react";
 
 // Types
+// Helper to format logs with basic syntax highlighting
+const renderFormattedLogs = (logs: string) => {
+  if (!logs) return <span style={{ color: "#9ca3af" }}>等待输出日志...</span>;
+  
+  return logs.split("\n").map((line, idx) => {
+    let color = "#e6edf3";
+    let fontWeight: "normal" | "bold" = "normal";
+    
+    if (line.includes("ERROR") || line.includes("Failed")) {
+      color = "#f87171"; // Red-400
+      fontWeight = "bold";
+    } else if (line.includes("WARNING")) {
+      color = "#fbbf24"; // Yellow-400
+      fontWeight = "bold";
+    } else if (line.includes("INFO")) {
+      color = "#60a5fa"; // Blue-400
+    } else if (line.startsWith("[System]")) {
+      color = "#34d399"; // Emerald-400
+      fontWeight = "bold";
+    }
+    
+    return (
+      <div key={idx} style={{ color, fontWeight, minHeight: "1.6em", whiteSpace: "pre", overflowWrap: "normal", wordBreak: "normal" }}>
+        {line}
+      </div>
+    );
+  });
+};
+
 interface Task {
   id: string;
   command: string;
@@ -1508,26 +1537,84 @@ function AppContent() {
               />
             </div>
 
+            {/* Task Summary Card */}
+            <LayerCard className="p-4 bg-kumo-canvas border border-kumo-line rounded-lg flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <Text variant="secondary" size="xs">传输路径</Text>
+                <div className="font-mono text-sm text-kumo-default truncate flex items-center gap-1">
+                  <span className="font-semibold">{selectedTask.source}</span>
+                  <span className="text-kumo-subtle">&rarr;</span>
+                  <span className="text-kumo-subtle">{selectedTask.destination}</span>
+                </div>
+              </div>
+
+              <Grid variant="4up" gap="base">
+                <GridItem>
+                  <div className="flex flex-col gap-1">
+                    <Text variant="secondary" size="xs">数据进度</Text>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-semibold text-sm text-kumo-default">
+                        {selectedTask.bytesTransferred || selectedTask.transferred || `${selectedTask.progress}%`}
+                      </span>
+                      <Meter value={selectedTask.progress} label="" />
+                    </div>
+                  </div>
+                </GridItem>
+                <GridItem>
+                  <div className="flex flex-col gap-1">
+                    <Text variant="secondary" size="xs">文件进度 &amp; 线程</Text>
+                    <div className="font-mono text-sm text-kumo-default font-semibold flex items-center gap-2">
+                      <span>{selectedTask.filesTransferred || "--"}</span>
+                      {selectedTask.activeThreads !== undefined && selectedTask.activeThreads > 0 && (
+                        <Badge variant="info">{selectedTask.activeThreads} 线程</Badge>
+                      )}
+                    </div>
+                  </div>
+                </GridItem>
+                <GridItem>
+                  <div className="flex flex-col gap-1">
+                    <Text variant="secondary" size="xs">速度 &amp; ETA</Text>
+                    <div className="font-mono text-sm text-kumo-default font-semibold">
+                      {selectedTask.status === "running" ? (
+                        <span>{selectedTask.speed || "--"} <span className="text-xs text-kumo-subtle">(ETA: {selectedTask.eta || "--"})</span></span>
+                      ) : (
+                        <span className="text-kumo-subtle">—</span>
+                      )}
+                    </div>
+                  </div>
+                </GridItem>
+                <GridItem>
+                  <div className="flex flex-col gap-1">
+                    <Text variant="secondary" size="xs">运行耗时</Text>
+                    <div className="text-sm text-kumo-default font-semibold">
+                      {selectedTask.endTime ? (
+                        <span>
+                          耗时{" "}
+                          {Math.round(
+                            (new Date(selectedTask.endTime).getTime() - new Date(selectedTask.startTime).getTime()) / 1000
+                          )}{" "}
+                          秒
+                        </span>
+                      ) : (
+                        <span>
+                          已运行{" "}
+                          {Math.round(
+                            (new Date().getTime() - new Date(selectedTask.startTime).getTime()) / 1000
+                          )}{" "}
+                          秒
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </GridItem>
+              </Grid>
+            </LayerCard>
+
             <div
-              className="mt-4 border border-kumo-line rounded-lg overflow-auto scroll-smooth"
-              style={{ backgroundColor: "#0d1117", height: "420px" }}
+              className="mt-4 border border-kumo-line rounded-lg overflow-auto scroll-smooth p-4"
+              style={{ backgroundColor: "#0d1117", height: "350px", fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace", fontSize: "12px", lineHeight: "1.6" }}
             >
-              <pre
-                style={{
-                  margin: 0,
-                  padding: "16px",
-                  fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
-                  fontSize: "12px",
-                  lineHeight: "1.6",
-                  color: "#e6edf3",
-                  whiteSpace: "pre",
-                  overflowWrap: "normal",
-                  wordBreak: "normal",
-                  minWidth: "max-content",
-                }}
-              >
-                {selectedTask.logs || "等待输出日志..."}
-              </pre>
+              {renderFormattedLogs(selectedTask.logs)}
               <div ref={logEndRef} />
             </div>
 

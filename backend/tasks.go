@@ -273,9 +273,18 @@ func runTaskProcess(task *Task) error {
 				continue
 			}
 
-			logLines = append(logLines, cleanText)
-			if len(logLines) > 2000 {
-				logLines = logLines[1:]
+			// Filter out repeating progress lines from persistent logs
+			isProgressLine := strings.Contains(cleanText, "Transferred:") ||
+				strings.Contains(cleanText, "Checks:") ||
+				strings.Contains(cleanText, "Elapsed time:") ||
+				strings.Contains(cleanText, "Transferring:") ||
+				strings.HasPrefix(cleanText, "* ")
+
+			if !isProgressLine {
+				logLines = append(logLines, cleanText)
+				if len(logLines) > 2000 {
+					logLines = logLines[1:]
+				}
 			}
 
 			// Parse overall progress info
