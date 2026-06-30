@@ -25,5 +25,11 @@ FROM alpine:latest
 RUN apk add --no-cache ca-certificates fuse fuse3 tzdata
 WORKDIR /app
 COPY --from=backend-builder /app/backend/webrclone /app/webrclone
+
+# Set the default data directory for persistent storage
+# All stateful files (auth.json, tasks_db.json, rclone.conf, bin/) go here
+ENV WEBRCLONE_DATA_DIR=/data
+VOLUME /data
+
 EXPOSE 8080
 ENTRYPOINT ["/app/webrclone"]
