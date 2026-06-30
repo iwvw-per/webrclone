@@ -1490,7 +1490,7 @@ function AppContent() {
       {/* 3. Real-Time Task Logs Modal */}
       {isLogsModalOpen && selectedTask && (
         <Dialog.Root open={isLogsModalOpen} onOpenChange={setIsLogsModalOpen}>
-          <Dialog className="p-8 max-w-3xl w-full">
+          <Dialog className="p-8 max-w-5xl w-full">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <Dialog.Title className="text-xl font-bold text-kumo-default">
@@ -1509,10 +1509,25 @@ function AppContent() {
             </div>
 
             <div
-              className="mt-4 border border-kumo-line rounded-lg overflow-y-auto font-mono text-xs p-4 select-text whitespace-pre-wrap break-all scroll-smooth bg-[#0d1117]"
-              style={{ backgroundColor: "#0d1117", height: "384px", color: "#e6edf3" }}
+              className="mt-4 border border-kumo-line rounded-lg overflow-auto scroll-smooth"
+              style={{ backgroundColor: "#0d1117", height: "420px" }}
             >
-              {selectedTask.logs || "等待输出日志..."}
+              <pre
+                style={{
+                  margin: 0,
+                  padding: "16px",
+                  fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
+                  fontSize: "12px",
+                  lineHeight: "1.6",
+                  color: "#e6edf3",
+                  whiteSpace: "pre",
+                  overflowWrap: "normal",
+                  wordBreak: "normal",
+                  minWidth: "max-content",
+                }}
+              >
+                {selectedTask.logs || "等待输出日志..."}
+              </pre>
               <div ref={logEndRef} />
             </div>
 
