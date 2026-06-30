@@ -12,7 +12,7 @@
   "dependencies": {
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "@cloudflare/kumo": "file:E:/Code/kumo资料/kumo/packages/kumo",
+    "@cloudflare/kumo": "file:libs/cloudflare-kumo-2.5.2.tgz",
     "@phosphor-icons/react": "^2.1.10",
     "clsx": "^2.1.1",
     "tailwind-merge": "^3.0.0"

@@ -2,6 +2,7 @@
 FROM node:18-alpine AS frontend-builder
 WORKDIR /app
 COPY frontend/package*.json ./
+COPY frontend/libs/ ./libs/
 RUN npm config set registry https://registry.npmmirror.com
 RUN npm install
 COPY frontend/ ./
