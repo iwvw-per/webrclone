@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import {
   Badge,
-  Banner,
   Button,
   Dialog,
   Grid,
@@ -14,7 +13,9 @@ import {
   Select,
   Table,
   Text,
-  SensitiveInput
+  SensitiveInput,
+  Toasty,
+  useKumoToastManager
 } from "@cloudflare/kumo";
 import {
   House,
@@ -27,7 +28,6 @@ import {
   Trash,
   ArrowClockwise,
   Eye,
-  WarningCircle,
   X,
   CheckCircle,
   FileText
@@ -55,6 +55,16 @@ interface Task {
 }
 
 export default function App() {
+  return (
+    <Toasty>
+      <AppContent />
+    </Toasty>
+  );
+}
+
+function AppContent() {
+  const toastManager = useKumoToastManager();
+
   // Authentication State
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -87,8 +97,6 @@ export default function App() {
   }, []);
 
   const [activeTab, setActiveTab] = useState<string>("dashboard");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Rclone Binary State
   const [rcloneVersion, setRcloneVersion] = useState<string>("Checking...");
@@ -303,13 +311,11 @@ export default function App() {
   }, [isLogsModalOpen]);
 
   const showNotification = (type: "success" | "error", msg: string) => {
-    if (type === "success") {
-      setSuccessMsg(msg);
-      setTimeout(() => setSuccessMsg(null), 5000);
-    } else {
-      setErrorMsg(msg);
-      setTimeout(() => setErrorMsg(null), 5000);
-    }
+    toastManager.add({
+      title: type === "success" ? "操作成功" : "发生错误",
+      description: msg,
+      variant: type === "success" ? "success" : "error",
+    });
   };
 
   const fetchRcloneStatus = () => {
@@ -661,12 +667,6 @@ export default function App() {
             <Text variant="secondary" size="sm">请输入您的用户名和密码以访问控制面板</Text>
           </div>
 
-          {errorMsg && (
-            <Banner variant="error" icon={<WarningCircle weight="fill" />}>
-              {errorMsg}
-            </Banner>
-          )}
-
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
             <Input
               label="用户名"
@@ -771,17 +771,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 p-4 overflow-y-auto flex flex-col gap-4">
-        {/* Global Notifications */}
-        {errorMsg && (
-          <Banner variant="error" icon={<WarningCircle weight="fill" />}>
-            {errorMsg}
-          </Banner>
-        )}
-        {successMsg && (
-          <Banner variant="default" icon={<CheckCircle weight="fill" />}>
-            {successMsg}
-          </Banner>
-        )}
+
 
         {/* 1. Dashboard Tab */}
         {activeTab === "dashboard" && (
@@ -1092,13 +1082,13 @@ export default function App() {
               <Table className="w-full" style={{ tableLayout: "fixed" }}>
                 <Table.Header>
                   <Table.Row>
-                    <Table.Head style={{ width: "150px", textAlign: "left" }}>任务 ID</Table.Head>
-                    <Table.Head style={{ width: "70px", textAlign: "left" }}>命令</Table.Head>
-                    <Table.Head style={{ textAlign: "left" }}>源目录 &rarr; 目标目录</Table.Head>
-                    <Table.Head style={{ width: "90px", textAlign: "left" }}>传输状态</Table.Head>
-                    <Table.Head style={{ width: "240px", textAlign: "left" }}>进度</Table.Head>
-                    <Table.Head style={{ width: "160px", textAlign: "left" }}>传输速率</Table.Head>
-                    <Table.Head style={{ width: "200px", textAlign: "right" }}>操作</Table.Head>
+                    <Table.Head style={{ width: "12%", textAlign: "center" }}>任务 ID</Table.Head>
+                    <Table.Head style={{ width: "6%", textAlign: "center" }}>命令</Table.Head>
+                    <Table.Head style={{ width: "28%", textAlign: "center" }}>源目录 &rarr; 目标目录</Table.Head>
+                    <Table.Head style={{ width: "8%", textAlign: "center" }}>传输状态</Table.Head>
+                    <Table.Head style={{ width: "18%", textAlign: "center" }}>进度</Table.Head>
+                    <Table.Head style={{ width: "12%", textAlign: "center" }}>传输速率</Table.Head>
+                    <Table.Head style={{ width: "16%", textAlign: "center" }}>操作</Table.Head>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -1123,19 +1113,19 @@ export default function App() {
 
                       return (
                         <Table.Row key={task.id}>
-                          <Table.Cell style={{ width: "150px", textAlign: "left" }} className="font-mono text-xs text-kumo-default truncate" title={task.id}>{task.id}</Table.Cell>
-                          <Table.Cell style={{ width: "70px", textAlign: "left" }}>
+                          <Table.Cell style={{ width: "12%", textAlign: "center" }} className="font-mono text-xs text-kumo-default truncate" title={task.id}>{task.id}</Table.Cell>
+                          <Table.Cell style={{ width: "6%", textAlign: "center" }}>
                             <Badge variant="outline">{task.command.toUpperCase()}</Badge>
                           </Table.Cell>
-                          <Table.Cell style={{ textAlign: "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={`${task.source} → ${task.destination}`}>
-                            <div className="font-mono text-xs text-kumo-default flex items-center gap-1" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          <Table.Cell style={{ width: "28%", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={`${task.source} → ${task.destination}`}>
+                            <div className="font-mono text-xs text-kumo-default flex items-center justify-center gap-1" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                               <span className="font-semibold">{task.source}</span>
                               <span className="text-kumo-subtle">&rarr;</span>
                               <span className="text-kumo-subtle">{task.destination}</span>
                             </div>
                           </Table.Cell>
-                          <Table.Cell style={{ width: "90px", textAlign: "left" }}>{statusBadge}</Table.Cell>
-                          <Table.Cell style={{ width: "240px", textAlign: "left" }}>
+                          <Table.Cell style={{ width: "8%", textAlign: "center" }}>{statusBadge}</Table.Cell>
+                          <Table.Cell style={{ width: "18%", textAlign: "center" }}>
                             {task.status === "running" ? (
                               <div className="flex flex-col gap-1 w-full">
                                 <Meter
@@ -1149,7 +1139,7 @@ export default function App() {
                                 </div>
                               </div>
                             ) : (
-                              <div className="flex flex-col gap-1">
+                              <div className="flex flex-col gap-1 items-center">
                                 <div className="font-mono text-xs text-kumo-subtle">
                                   进度: {task.progress}%
                                 </div>
@@ -1161,14 +1151,14 @@ export default function App() {
                               </div>
                             )}
                           </Table.Cell>
-                          <Table.Cell style={{ width: "160px", textAlign: "left" }}>
+                          <Table.Cell style={{ width: "12%", textAlign: "center" }}>
                             {task.status === "running" ? (
-                              <div className="flex flex-col gap-0.5 font-mono text-xs text-kumo-default">
+                              <div className="flex flex-col gap-0.5 font-mono text-xs text-kumo-default items-center">
                                 <span className="font-semibold">{task.speed || "--"}</span>
                                 <span className="text-kumo-subtle">ETA: {task.eta || "--"}</span>
                               </div>
                             ) : (
-                              <div className="flex flex-col gap-0.5 font-mono text-xs text-kumo-subtle">
+                              <div className="flex flex-col gap-0.5 font-mono text-xs text-kumo-subtle items-center">
                                 {task.bytesTransferred && (
                                   <div>总量: {task.bytesTransferred}</div>
                                 )}
@@ -1184,8 +1174,8 @@ export default function App() {
                               </div>
                             )}
                           </Table.Cell>
-                          <Table.Cell style={{ width: "200px", textAlign: "right" }}>
-                            <div className="flex justify-end gap-1.5 flex-wrap">
+                          <Table.Cell style={{ width: "16%", textAlign: "center" }}>
+                            <div className="flex justify-center gap-1.5 flex-wrap">
                               <Button size="sm" variant="secondary" onClick={() => viewTaskLogs(task)}>
                                 <Eye size={16} />
                                 日志
